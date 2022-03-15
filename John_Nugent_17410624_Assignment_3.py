@@ -2,30 +2,36 @@ import numpy as np
 
 class Packet:
     def __init__(self):
-        self.size = 1500; # Bytes
+        self.size = 1500 * 8; # bits
 
     def get_size(self):
-        return self.size 
+        return self.size
+
 class Header:
     def __init__(self):
         # a and g total size is 1542
         # n, ac, ax total size = 1548
         self.packet = Packet();
 
-        self.MAC_header = 34; # bytes
+        self.MAC_header = 34 * 8; # bits
 
-        self.SNAP_LLC = 8; # bytes
+        self.SNAP_LLC = 8 * 8; # bits
 
     def get_size(self):
-        return self.packet.get_size() + self.MAC_header + self.SNAP_LLC; # Bytes
+        return self.packet.get_size() + self.MAC_header + self.SNAP_LLC;
 
     def add_MAC_bytes(self, extra):
         # Add 40 for n, ac and ax.
-        self.MAC_header = self.MAC_header + extra;
+
+        # Set bytes to bits.
+        extra_bits = extra*8
+        self.MAC_header = self.MAC_header + extra_bits;
 
     def add_SNAP_bytes(self, extra):
         # Add 8 for ac, ax and an.
-        self.SNAP_LLC = self.SNAP_LLC + extra;
+        # Set bytes to bits.
+        extra_bits = extra*8
+        self.SNAP_LLC = self.SNAP_LLC + extra_bits;
 
     def set_n_ac_ax(self):
         self.add_MAC_bytes(40);
@@ -34,7 +40,7 @@ class Header:
 
 class ACK:
     def __init__(self):
-        self.header_info = 40;
+        self.header_info = 40*8; # bits
 
 class DataRate:
     def __init__(self, modulation, NBits, CRate, NChan, SDur, Data_Rate):
@@ -46,7 +52,7 @@ class DataRate:
 
         self.NChan = NChan;
 
-        self.SDur = SDur; # mu s
+        self.SDur = SDur;
 
         self.data_rate = Data_Rate; # Mbps
 
@@ -57,42 +63,44 @@ class a:
 
         self.header = Header();
 
-        self.SIFS = 16; # mu s
+        self.SIFS = 16E-6; # seconds
 
-        self.slot = 9; # mu s
+        self.slot = 9E-6; # seconds
 
         self.DIFS = (2*self.slot) + self.SIFS
 
-        self.max_dr = 54; # Mbps
+        self.max_dr = 54E6; # bps
 
-        self.symbol_tx_time = 4; # mu s
+        self.symbol_tx_time = 4E-6; # seconds
 
         self.ofdm_tail=0;
 
         # if use_ofdm:
         #     self.ofdm_tail = 6;
 
-        self.rts_size = 20; # bytes
+        self.rts_size = 20*8; # bits
 
-        self.cts_size = 14; # bytes
+        self.cts_size = 14*8; # bits
 
-        self.ack_size = 14; # Bytes
+        self.ack_size = 14*8; # bits
 
-        self.preamble = 20; # mu s
+        self.preamble = 20E-6; # mu s
 
         # Used Packet Size instead.
         # self.data_size = 1500; # Bytes.
 
-        self.data_rates = [DataRate("BPSK", 1, 1/2, 48, 4, 6), DataRate("64-QAM", 6, 3/4, 48, 4, 54)];
+        self.data_rates = [DataRate("BPSK", 1, 1/2, 48, 4E-6, 6E6), DataRate("64-QAM", 6, 3/4, 48, 4E-6, 54E6)];
 
     def set_OFDM(self):
-        self.ofdm_tail = 6;
+        self.ofdm_tail = 6; # bits
 
     def get_ofdm_symbols(self):
-        header_bytes = self.header.get_size();
+        # header_bytes = self.header.get_size();
 
-        header_bits = header_bytes * 8;
-
+        # header_bits = header_bytes * 8;
+        
+        header_bits= self.header.get_size();
+        
         ofdm_bits = header_bits + self.ofdm_tail;
 
         ofdm_symbols = np.ceil(ofdm_bits / self.bits_per_ofdm_symbol());
@@ -108,16 +116,16 @@ class a:
         return bps
 
     def frame_transmit_time(self):
-        return self.get_ofdm_symbols() * self.symbol_tx_time; # mu s
+        return self.get_ofdm_symbols() * self.symbol_tx_time;
 
     def rts_tx_time(self):
-        return self.symbols_to_tx_time(self.bits_to_symbols((self.rts_size*8)+6))
+        return self.symbols_to_tx_time(self.bits_to_symbols((self.rts_size)+6))
 
     def cts_tx_time(self):
-        return self.symbols_to_tx_time(self.bits_to_symbols((self.cts_size*8)+6))
+        return self.symbols_to_tx_time(self.bits_to_symbols((self.cts_size)+6))
 
     def ack_tx_time(self):
-        return self.symbols_to_tx_time(self.bytes_to_symbols(self.ack_size))
+        return self.symbols_to_tx_time(self.bits_to_symbols(self.ack_size))
 
     def data_rate(self):
         return (1/self.SDur) * (self.bits_per_ofdm_symbol())
@@ -142,13 +150,11 @@ class a:
     def time_to_send(self):
         return self.DIFS + self.preamble + self.rts_tx_time() + self.SIFS + self.preamble + self.cts_tx_time() + self.SIFS +self.preamble + self.tx_data_time(verbose=True) + self.SIFS + self.preamble + self.ack_tx_time();
 
-    def get_throughput(self, bytes):
-        return (bytes * 8) / self.time_to_send()
+    def get_throughput(self, bits):
+        return bits / self.time_to_send()
 
-    def time_to_transfer(self, bytes):
-        return (bytes*8) / self.get_throughput(1500)
-
-
+    def time_to_transfer(self, bits):
+        return bits / self.get_throughput(1500*8)
 
 menu1 = ["802.11a", "802.11g", "802.11n", "802.11ac_w1", "802.11ac_w2", "802.11ax"]
 
@@ -221,9 +227,9 @@ def main():
     
     print(f"Time needed to transfer 15 x 10 9 bytes of data for {routine.name} @ {routine.data_rates[dr]} using {protocol}:")
 
-    print(f"{routine.time_to_transfer(15e3)}")
+    print(f"{routine.time_to_transfer(15e6)}")
 
 
 if __name__ == "__main__":
-    print(a().get_throughput(1500))
+    print(a().get_throughput(1500*8))
     main()

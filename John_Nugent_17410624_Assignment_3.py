@@ -488,7 +488,7 @@ def main():
 
         best_throughput = best_routine.get_throughput(Packet().get_size())
 
-    print(len(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {best_tf_time:.2f} seconds")*'=')
+    print(len(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {tf_time:.2f} seconds")*'=')
 
     print(f"Standard: {routine.name}")
 
@@ -504,7 +504,7 @@ def main():
     if not (best_routine == None):
         print(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {best_tf_time:.2f} seconds")
 
-    print(len(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {best_tf_time:.2f} seconds")*'=')
+    print(len(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {tf_time:.2f} seconds")*'=')
     
 
 

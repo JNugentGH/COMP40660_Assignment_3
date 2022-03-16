@@ -3,119 +3,156 @@ import numpy as np
 class Packet:
     '''Step 1: Packet Size.'''
     def __init__(self):
-        self.size = 1500; # Bytes
+        self.size = 1500 # Bytes
 
     def get_size(self):
-        return self.size 
+        return self.size
 
 class Header:
     def __init__(self):
         # a and g total size is 1542
         # n, ac, ax total size = 1548
-        self.packet = Packet();
+        self.packet = Packet()
 
-        # self.MAC_header = 34; # bytes
+        self.MAC_header = 0 # bytes
 
-        # self.SNAP_LLC = 8; # bytes
-
-        self.MAC_header = 0; # bytes
-
-        self.SNAP_LLC = 0; # bytes
+        self.SNAP_LLC = 0 # bytes
 
     def get_size(self):
-        return self.packet.get_size() + self.MAC_header + self.SNAP_LLC; # Bytes
+        return self.packet.get_size() + self.MAC_header + self.SNAP_LLC # Bytes
 
     def add_MAC_bytes(self, extra):
         # Add 40 for n, ac and ax.
-        self.MAC_header = self.MAC_header + extra;
+        self.MAC_header = self.MAC_header + extra
 
     def add_SNAP_bytes(self, extra):
         # Add 8 for ac, ax and an.
-        self.SNAP_LLC = self.SNAP_LLC + extra;
+        self.SNAP_LLC = self.SNAP_LLC + extra
 
     def set_n_ac_ax(self):
-        self.add_MAC_bytes(40);
+        self.add_MAC_bytes(40)
 
-        self.add_SNAP_bytes(8);
+        self.add_SNAP_bytes(8)
 
 class Ack:
     def __init__(self):
-        self.header_info = 40;
+        self.header_info = 40
 
-        self.MAC_header = 0;
+        self.MAC_header = 0
 
-        self.SNAP_LLC = 0;
+        self.SNAP_LLC = 0
 
     def add_MAC_bytes(self, extra):
         # Add 34 for a/g.
         # Add 40 for n, ac and ax.
-        self.MAC_header = self.MAC_header + extra;
+        self.MAC_header = self.MAC_header + extra
 
     def add_SNAP_bytes(self, extra):
         # Add 8 for a, g, ac, ax and an.
-        self.SNAP_LLC = self.SNAP_LLC + extra;
+        self.SNAP_LLC = self.SNAP_LLC + extra
 
-class DataRate:
-    def __init__(self, modulation, NBits, CRate, NChan, SDur, Data_Rate):
+    def get_size(self):
+        return self.header_info + self.MAC_header + self.SNAP_LLC # Bytes
+
+class DataRating:
+    def __init__(self, modulation, NBits, CRate, NChan, SDur, Data_Rate, Nss=None):
         self.modulation = modulation
 
-        self.NBits = NBits;
+        self.NBits = NBits
 
-        self.CRate = CRate;
+        self.CRate = CRate
 
-        self.NChan = NChan;
+        self.NChan = NChan
 
-        self.SDur = SDur; # mu s
+        self.SDur = SDur # mu s
 
-        self.data_rate = Data_Rate; # Mbps
+        self.data_rate = Data_Rate # Mbps
+
+        if Nss:
+            self.Nss = Nss
+        else:
+            self.Nss = 1
+
+    def get_bits_per_symbol(self):
+        return self.NBits * self.CRate * self.NChan * self.Nss # bits/symbol!
+
+    def get_data_rate(self):
+        return self.get_bits_per_symbol() / self.SDur # Mbps
+
+    def __str__(self):
+        return f"{self.get_data_rate()} Mb/s"
 
     
 class a:
-    def __init__(self):
-        self.name = "802.11a";
+    def __init__(self, protocol=None, data_speed=None):
+        self.name = "802.11a"
 
-        self.header = Header();
+        self.header = Header()
         
-        self.header.add_MAC_bytes(34); # bytes
+        self.header.add_MAC_bytes(34) # bytes
 
-        # self.SNAP_LLC = 8; # bytes
-        self.header.add_SNAP_bytes(8)
+        self.header.add_SNAP_bytes(8)   # Bytes
 
-        self.SIFS = 16; # mu s
+        # self.SIFS = 16 # mu s
+        self.set_sifs(16) # mu s
 
-        self.slot = 9; # mu s
+        self.slot = 9 # mu s
 
-        self.DIFS = (2*self.slot) + self.SIFS
+        self.symbol_tx_time = 4 # mu s
 
-        self.max_dr = 54; # Mbps
+        self.ofdm_tail = 6 # bits!
 
-        self.symbol_tx_time = 4; # mu s
+        self.rts_size = 20 # bytes
 
-        self.ofdm_tail=6; # bits!
+        self.cts_size = 14 # bytes
 
-        self.rts_size = 20; # bytes
-
-        self.cts_size = 14; # bytes
-
-        self.udp_ack_size = 14; # Bytes
+        self.mac_ack_size = 14 # Bytes
 
         # Step 2: Ack size.
         self.tcp_ack = Ack()
         self.tcp_ack.add_MAC_bytes(34)
         self.tcp_ack.add_SNAP_bytes(8)
 
-        self.preamble = 20; # mu s
+        self.preamble = 20 # mu s
 
-        self.data_rates = [DataRate("BPSK", 1, 1/2, 48, 4, 6), DataRate("64-QAM", 6, 3/4, 48, 4, 54)];
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 48, 4, 6), DataRating("64-QAM", 6, 3/4, 48, 4, 54)]
+
+        if not protocol:
+            # Default to UDP.
+            self.protocol = 'UDP' 
+
+        if not data_speed:
+            # default to Max
+            self.data_rating = self.data_ratings[1]
+
+
+    def setup(self, protocol, data_speed):
+        if protocol == 'UDP':
+            self.protocol = 'UDP'
+        
+        else:
+            self.protocol = 'TCP'
+
+        if data_speed == 'Minimum':
+            self.data_rating = self.data_ratings[0]
+
+        else:
+            self.data_rating = self.data_ratings[1]
+
+    def set_sifs(self, sif):
+        self.SIFS = sif
+
+    def get_DIFS(self):
+        return (2*self.slot) + self.SIFS
 
     def set_OFDM(self):
-        self.ofdm_tail = 6;
+        self.ofdm_tail = 6
 
     def get_bits_per_frame(self):
         ''' Step 4: Get bits per OFDM Frame.'''
-        header_bits = self.header.get_size() * 8;
+        header_bits = self.header.get_size() * 8
 
-        ofdm_bits_pf = header_bits + self.ofdm_tail;            # bits per OFDM frame.
+        ofdm_bits_pf = header_bits + self.ofdm_tail            # bits per OFDM frame.
 
         return ofdm_bits_pf
 
@@ -129,7 +166,8 @@ class a:
     
     def bits_per_ofdm_symbol(self, verbose=False):
         '''Step 3: Data bits per OFDM symbol.'''
-        bps = self.data_rates[1].NBits * self.data_rates[1].CRate * self.data_rates[1].NChan; # bits/symbol!
+        # bps = self.data_rating.NBits * self.data_rating.CRate * self.data_rating.NChan # bits/symbol!
+        bps = self.data_rating.get_bits_per_symbol()
         
         bps = np.floor(bps) # Round down to nearest integer.
 
@@ -140,19 +178,35 @@ class a:
         return bps
 
     def frame_transmit_time(self):
-        return self.get_ofdm_symbols() * self.symbol_tx_time; # mu s
+        '''Step 6: frame transmit time'''
+        return self.get_ofdm_symbols() * self.symbol_tx_time # mu s
 
     def rts_tx_time(self):
+        '''Step 7.1: RTS transmit time.'''
         return self.symbols_to_tx_time(self.bits_to_symbols((self.rts_size*8)+6))
 
     def cts_tx_time(self):
+        '''Step 7.2: CTS transmit time.'''
         return self.symbols_to_tx_time(self.bits_to_symbols((self.cts_size*8)+6))
 
     def ack_tx_time(self):
-        return self.symbols_to_tx_time(self.bytes_to_symbols(self.udp_ack_size))
+        '''Step 8.1: MAC ACK transmit time.'''
+        return self.symbols_to_tx_time(self.bytes_to_symbols(self.mac_ack_size))
 
-    def data_rate(self):
-        return (1/self.SDur) * (self.bits_per_ofdm_symbol())
+    def tcp_ack_tx_time(self, verbose=False):
+        byt = self.tcp_ack.get_size()
+
+        symbols = self.bytes_to_symbols(byt)
+
+        time = self.symbols_to_tx_time(symbols)
+
+        if verbose:
+            print(f"tcp ack\nbytes: {byt}\nsymbols:{symbols}\ntime:{time}")
+
+        return time # mu s
+
+    # def data_rate(self):
+    #     return (1/self.SDur) * (self.bits_per_ofdm_symbol())
 
     def bits_to_symbols(self, bit_count):
         return np.ceil(bit_count / self.bits_per_ofdm_symbol())
@@ -161,24 +215,129 @@ class a:
         return self.bits_to_symbols(byte_count*8)
 
     def symbols_to_tx_time(self, symbol_count):
-        return symbol_count * self.symbol_tx_time;
+        return symbol_count * self.symbol_tx_time # symbols * mu s = mu s
 
     def tx_data_time(self, verbose = False):
-        tx_time = self.symbols_to_tx_time(self.bits_to_symbols((self.header.get_size()*8)+6));
+        # tx_time = self.symbols_to_tx_time(self.bits_to_symbols((1500*8)+6))
+        bits = (self.header.get_size()*8)+6
+
+        symbols = self.bits_to_symbols(bits)
+        
+        tx_time = self.symbols_to_tx_time(symbols)
 
         if verbose:
-            print(f"Time to Transmit Data: {tx_time}")
+            print(f"bits:{bits}\nsymbols:{symbols}\nTime to Transmit 1 Data Packet: {tx_time}")
         
         return tx_time
 
     def time_to_send(self):
-        return self.DIFS + self.preamble + self.rts_tx_time() + self.SIFS + self.preamble + self.cts_tx_time() + self.SIFS +self.preamble + self.tx_data_time(verbose=True) + self.SIFS + self.preamble + self.ack_tx_time();
+        '''Step 9: Sum all tx times.'''
+        sum = 0
+        
+        sum = sum + self.get_DIFS()
+        sum = sum + self.preamble 
+        sum = sum + self.rts_tx_time() 
+        sum = sum + self.SIFS 
+        sum = sum + self.preamble 
+        sum = sum + self.cts_tx_time() 
+        sum = sum + self.SIFS
+        sum = sum + self.preamble 
+        sum = sum + self.tx_data_time(verbose=False) 
+        sum = sum + self.SIFS
+        sum = sum + self.preamble 
+        sum = sum + self.ack_tx_time()
 
-    def get_throughput(self, bytes):
-        return (bytes * 8) / self.time_to_send()
+        if self.protocol == 'TCP':
+            sum = sum + self.SIFS
+            sum = sum + self.tcp_ack_tx_time()
+            # print(f"tcp ack tx time: {self.tcp_ack_tx_time()}")
 
-    def time_to_transfer(self, bytes):
-        return (bytes*8) / self.get_throughput(1500)
+
+        return sum # mu s
+
+    def get_throughput(self, bytes_in):
+        '''Step 10: Throughput.'''
+        bits = bytes_in*8
+
+        seconds = self.time_to_send() /1e6 #... seconds
+
+        return bits / seconds # bits/second
+
+    def time_to_transfer(self, bytes_in):
+        bits = bytes_in*8 # bits
+
+        throughput = self.get_throughput(Packet().get_size()) # bits/second
+
+        return bits / throughput # bits / (bits/second) = seconds
+    
+    # End of class a.
+
+class g(a):
+    def __init__(self, protocol=None, data_speed=None):
+        a.__init__(self, protocol, data_speed)
+
+        self.name = "802.11g"
+
+        self.set_sifs(10)
+
+    def time_to_send(self):
+        return a.time_to_send(self) + 6 # mu s
+        
+    # End of class g.
+
+class n(a):
+    def __init__(self, protocol=None, data_speed=None):
+        a.__init__(self, protocol, data_speed)
+
+        self.name = "802.11n"
+
+        self.set_sifs(16) # mu s
+
+        self.header = Header()
+
+        self.header.add_MAC_bytes(40) # Bytes
+
+        self.header.add_SNAP_bytes(8) # Bytes
+
+        self.symbol_tx_time = 3.6 # mu s
+
+        self.preamble = 46 # mu s
+
+        self.tcp_ack = Ack()
+        self.tcp_ack.add_MAC_bytes(40)
+        self.tcp_ack.add_SNAP_bytes(8)
+
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("QAM", 6, 5/6, 108, 3.6, 150, 4)]
+
+
+class ac_w1(n):
+    def __init__(self, protocol=None, data_speed=None):
+        n.__init__(self, protocol=protocol, data_speed=data_speed)
+
+        self.name = "802.11ac_w1"
+
+        self.preamble = 56.8
+
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("80MHz", 8, 5/6, 234, 3.6, 433.3, 3)]
+
+class ac_w2(n):
+    def __init__(self, protocol=None, data_speed=None):
+        n.__init__(self, protocol=protocol, data_speed=data_speed)
+
+        self.name = "802.11ac_w2"
+
+        self.preamble = 92.8
+
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("80MHz", 8, 5/6, 468, 3.6, 866.7, 8)]
+
+class ax(ac_w2):
+    def __init__(self, protocol=None, data_speed=None):
+        ac_w2.__init__(self, protocol, data_speed)
+
+        self.name = "802.11ax"
+
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 234, 13.6, 8.6), DataRating("1024-QAM", 10, 5/6, 1960, 13.6, 9607.8, 8)]
+
 
 menu1 = ["802.11a", "802.11g", "802.11n", "802.11ac_w1", "802.11ac_w2", "802.11ax"]
 
@@ -191,8 +350,21 @@ def main():
 
     for i, std in enumerate(menu1):
         print(f"{i+1}. {std}")
+    
+    valid = False
+    all_numbers = True
 
-    x = input("Number of standard: ")
+    while not valid:
+        x = input("Number of standard: ")
+        all_numbers = True
+
+        for i in range(len(x)):
+            if not (ord(x[i]) >= 48 and ord(x[i])<=57):
+                all_numbers=False
+            
+        if all_numbers:
+            if (int(x) > 0) and (int(x) <= len(menu1)):
+                valid = True
 
     x = int(x)-1
 
@@ -205,55 +377,92 @@ def main():
     for i, dr in enumerate(menu2):
         print(f"{i+1}. {dr}")
 
-    x = input("Number of Data Rate: ")
+    valid = False
+    all_numbers = True
 
+    while not valid:
+        x = input("Number of Data Rate: ")
+        all_numbers = True
+
+        for i in range(len(x)):
+            if not (ord(x[i]) >= 48 and ord(x[i])<=57):
+                all_numbers=False
+            
+        if all_numbers:
+            if (int(x) > 0) and (int(x) <= len(menu2)):
+                valid = True
+                
     dr = int(x)-1
 
-    data_rate = menu2[dr]
+    data_rating = menu2[dr]
 
-    print(f"You have chosen the {data_rate} data rate.")
+    print(f"You have chosen the {data_rating} data rate.")
 
     print("Which protocol would you like to use?")
 
     for i, prot in enumerate(menu3):
         print(f"{i+1}. {prot}")
 
-    x = input("Number of Protocol: ")
+    valid = False
+    all_numbers = True
 
+    while not valid:
+        x = input("Number of Protocol: ")
+        all_numbers = True
+
+        for i in range(len(x)):
+            if not (ord(x[i]) >= 48 and ord(x[i])<=57):
+                all_numbers=False
+            
+        if all_numbers:
+            if (int(x) > 0) and (int(x) <= len(menu2)):
+                valid = True
+                
     x = int(x)-1
 
     protocol = menu3[x]
 
     print(f"You have chosen the {protocol} protocol.")
 
-    routine = None;
+    routine = None
 
     if standard == menu1[0]:
-        routine = a();
+        routine = a()
 
     elif standard == menu1[1]:
-        routine = g();
+        routine = g()
 
     elif standard == menu1[2]:
-        routine = n();
+        routine = n()
 
     elif standard == menu1[3]:
-        routine = ac_w1();
+        routine = ac_w1()
 
     elif standard == menu1[4]:
-        routine = ac_w2();
+        routine = ac_w2()
 
     elif standard == menu1[5]:
-        routine = ax();
+        routine = ax()
     
     else:
         print(f"Options not found.")
     
-    print(f"Time needed to transfer 15 x 10 9 bytes of data for {routine.name} @ {routine.data_rates[dr]} using {protocol}:")
+    routine.setup(protocol, data_rating)
 
-    print(f"{routine.time_to_transfer(15e3)}")
+    tf_time = routine.time_to_transfer(15e9)
+
+    throughput = routine.get_throughput(Packet().get_size())
+
+    print(len(f"Time to Transmit 15 x 10^9 Bytes: {tf_time} seconds")*'=')
+    print(f"Standard: {routine.name}")
+    print(f"Protocol: {routine.protocol}")
+    print(f"Actual MAC Throughput: {throughput/1e6:.2f} Mb/s")
+    print(f"Time to Transmit 15 x 10^9 Bytes: {tf_time} seconds")
+    print(len(f"Time to Transmit (15 x 10^9) Bytes: {tf_time} seconds")*'=')
+    
 
 
 if __name__ == "__main__":
-    print(a().get_throughput(1500))
+    # print(a().get_throughput(1500), 'bits/second')
+
     main()

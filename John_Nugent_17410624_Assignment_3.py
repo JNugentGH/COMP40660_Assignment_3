@@ -1,20 +1,26 @@
 import numpy as np
 
 class Packet:
+    '''Step 1: Packet Size.'''
     def __init__(self):
         self.size = 1500; # Bytes
 
     def get_size(self):
         return self.size 
+
 class Header:
     def __init__(self):
         # a and g total size is 1542
         # n, ac, ax total size = 1548
         self.packet = Packet();
 
-        self.MAC_header = 34; # bytes
+        # self.MAC_header = 34; # bytes
 
-        self.SNAP_LLC = 8; # bytes
+        # self.SNAP_LLC = 8; # bytes
+
+        self.MAC_header = 0; # bytes
+
+        self.SNAP_LLC = 0; # bytes
 
     def get_size(self):
         return self.packet.get_size() + self.MAC_header + self.SNAP_LLC; # Bytes
@@ -32,9 +38,22 @@ class Header:
 
         self.add_SNAP_bytes(8);
 
-class ACK:
+class Ack:
     def __init__(self):
         self.header_info = 40;
+
+        self.MAC_header = 0;
+
+        self.SNAP_LLC = 0;
+
+    def add_MAC_bytes(self, extra):
+        # Add 34 for a/g.
+        # Add 40 for n, ac and ax.
+        self.MAC_header = self.MAC_header + extra;
+
+    def add_SNAP_bytes(self, extra):
+        # Add 8 for a, g, ac, ax and an.
+        self.SNAP_LLC = self.SNAP_LLC + extra;
 
 class DataRate:
     def __init__(self, modulation, NBits, CRate, NChan, SDur, Data_Rate):
@@ -56,6 +75,11 @@ class a:
         self.name = "802.11a";
 
         self.header = Header();
+        
+        self.header.add_MAC_bytes(34); # bytes
+
+        # self.SNAP_LLC = 8; # bytes
+        self.header.add_SNAP_bytes(8)
 
         self.SIFS = 16; # mu s
 
@@ -67,41 +91,49 @@ class a:
 
         self.symbol_tx_time = 4; # mu s
 
-        self.ofdm_tail=0;
-
-        # if use_ofdm:
-        #     self.ofdm_tail = 6;
+        self.ofdm_tail=6; # bits!
 
         self.rts_size = 20; # bytes
 
         self.cts_size = 14; # bytes
 
-        self.ack_size = 14; # Bytes
+        self.udp_ack_size = 14; # Bytes
+
+        # Step 2: Ack size.
+        self.tcp_ack = Ack()
+        self.tcp_ack.add_MAC_bytes(34)
+        self.tcp_ack.add_SNAP_bytes(8)
 
         self.preamble = 20; # mu s
-
-        # Used Packet Size instead.
-        # self.data_size = 1500; # Bytes.
 
         self.data_rates = [DataRate("BPSK", 1, 1/2, 48, 4, 6), DataRate("64-QAM", 6, 3/4, 48, 4, 54)];
 
     def set_OFDM(self):
         self.ofdm_tail = 6;
 
+    def get_bits_per_frame(self):
+        ''' Step 4: Get bits per OFDM Frame.'''
+        header_bits = self.header.get_size() * 8;
+
+        ofdm_bits_pf = header_bits + self.ofdm_tail;            # bits per OFDM frame.
+
+        return ofdm_bits_pf
+
     def get_ofdm_symbols(self):
-        header_bytes = self.header.get_size();
-
-        header_bits = header_bytes * 8;
-
-        ofdm_bits = header_bits + self.ofdm_tail;
-
-        ofdm_symbols = np.ceil(ofdm_bits / self.bits_per_ofdm_symbol());
-
-        return ofdm_symbols;
+        ''' Step 5: Symbols per frame.'''
+        # (bits/frame) / (bits/symbol) = symbol/frame
+        ofdm_symbols = self.get_bits_per_frame() / self.bits_per_ofdm_symbol() 
+        
+        # Round up to nearest integer.
+        return  np.ceil(ofdm_symbols)                   
     
     def bits_per_ofdm_symbol(self, verbose=False):
-        bps = self.data_rates[1].NBits * self.data_rates[1].CRate * self.data_rates[1].NChan; # b/symbol
+        '''Step 3: Data bits per OFDM symbol.'''
+        bps = self.data_rates[1].NBits * self.data_rates[1].CRate * self.data_rates[1].NChan; # bits/symbol!
         
+        bps = np.floor(bps) # Round down to nearest integer.
+
+        # Print to see workings.
         if verbose:
             print(f"Bits per ofdm Symbol: {bps}")
             
@@ -117,7 +149,7 @@ class a:
         return self.symbols_to_tx_time(self.bits_to_symbols((self.cts_size*8)+6))
 
     def ack_tx_time(self):
-        return self.symbols_to_tx_time(self.bytes_to_symbols(self.ack_size))
+        return self.symbols_to_tx_time(self.bytes_to_symbols(self.udp_ack_size))
 
     def data_rate(self):
         return (1/self.SDur) * (self.bits_per_ofdm_symbol())
@@ -147,8 +179,6 @@ class a:
 
     def time_to_transfer(self, bytes):
         return (bytes*8) / self.get_throughput(1500)
-
-
 
 menu1 = ["802.11a", "802.11g", "802.11n", "802.11ac_w1", "802.11ac_w2", "802.11ax"]
 

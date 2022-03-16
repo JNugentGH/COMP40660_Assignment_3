@@ -494,12 +494,14 @@ def main():
 
     print(f"Protocol: {routine.protocol}")
 
-    print(f"Actual MAC Throughput: {throughput/1e6:.2f} Mb/s")
+    print(f"Data Speed: {data_rating} @ {routine.data_rating.get_data_rate():.2f} Mb/s")
+
+    print(f"Actual MAC Throughput in the Normal Case: {throughput/1e6:.2f} Mb/s")
     
     if not (best_routine == None):
         print(f"Actual MAC Throughput Best Case: {best_throughput/1e6:.2f} Mb/s")
 
-    print(f"Time to Transmit 15 x 10^9 Bytes: {tf_time:.2f} seconds")
+    print(f"Time to Transmit 15 x 10^9 Bytes in the Normal Case: {tf_time:.2f} seconds")
     
     if not (best_routine == None):
         print(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {best_tf_time:.2f} seconds")

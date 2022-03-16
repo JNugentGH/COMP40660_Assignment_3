@@ -307,7 +307,13 @@ class n(a):
         self.tcp_ack.add_MAC_bytes(40)
         self.tcp_ack.add_SNAP_bytes(8)
 
-        self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("QAM", 6, 5/6, 108, 3.6, 150, 4)]
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("64-QAM", 6, 5/6, 52, 3.6, 72.2)]
+
+class n_best(n):
+    def __init__(self, protocol=None, data_speed=None):
+        n.__init__(self, protocol, data_speed)
+
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("40 MHz", 6, 5/6, 108, 3.6, 150, 4)]
 
 
 class ac_w1(n):
@@ -317,6 +323,12 @@ class ac_w1(n):
         self.name = "802.11ac_w1"
 
         self.preamble = 56.8
+
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("256-QAM", 8, 5/6, 52, 3.6, 96.3)]
+
+class ac_w1_best(ac_w1):
+    def __init__(self, protocol=None, data_speed=None):
+        ac_w1.__init__(self, protocol, data_speed)
 
         self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("80MHz", 8, 5/6, 234, 3.6, 433.3, 3)]
 
@@ -328,7 +340,13 @@ class ac_w2(n):
 
         self.preamble = 92.8
 
-        self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("80MHz", 8, 5/6, 468, 3.6, 866.7, 8)]
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("256-QAM", 8, 5/6, 52, 3.6, 96.3, 1)]
+
+class ac_w2_best(ac_w2):
+    def __init__(self, protocol=None, data_speed=None):
+        ac_w2.__init__(self, protocol, data_speed)
+
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("160MHz", 8, 5/6, 468, 3.6, 866.7, 8)]
 
 class ax(ac_w2):
     def __init__(self, protocol=None, data_speed=None):
@@ -336,8 +354,13 @@ class ax(ac_w2):
 
         self.name = "802.11ax"
 
-        self.data_ratings = [DataRating("BPSK", 1, 1/2, 234, 13.6, 8.6), DataRating("1024-QAM", 10, 5/6, 1960, 13.6, 9607.8, 8)]
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 234, 13.6, 8.6), DataRating("1024-QAM", 10, 5/6, 234, 13.6, 143.4, 1)]
 
+class ax_best(ax):
+    def __init__(self, protocol=None, data_speed=None):
+        ax.__init__(self, protocol, data_speed)
+
+        self.data_ratings = [DataRating("BPSK", 1, 1/2, 1960, 13.6, 576.5, 8), DataRating("1024-QAM", 10, 5/6, 1960, 13.6, 9607.8, 8)]
 
 menu1 = ["802.11a", "802.11g", "802.11n", "802.11ac_w1", "802.11ac_w2", "802.11ax"]
 
@@ -425,6 +448,7 @@ def main():
     print(f"You have chosen the {protocol} protocol.")
 
     routine = None
+    best_routine=None
 
     if standard == menu1[0]:
         routine = a()
@@ -434,15 +458,19 @@ def main():
 
     elif standard == menu1[2]:
         routine = n()
+        best_routine = n_best()
 
     elif standard == menu1[3]:
         routine = ac_w1()
+        best_routine = ac_w1_best()
 
     elif standard == menu1[4]:
         routine = ac_w2()
+        best_routine = ac_w2_best()
 
     elif standard == menu1[5]:
         routine = ax()
+        best_routine = ax_best()
     
     else:
         print(f"Options not found.")
@@ -453,12 +481,30 @@ def main():
 
     throughput = routine.get_throughput(Packet().get_size())
 
-    print(len(f"Time to Transmit 15 x 10^9 Bytes: {tf_time} seconds")*'=')
+    if not (best_routine == None):
+        best_routine.setup(protocol, data_rating)
+
+        best_tf_time = best_routine.time_to_transfer(15e9)
+
+        best_throughput = best_routine.get_throughput(Packet().get_size())
+
+    print(len(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {best_tf_time:.2f} seconds")*'=')
+
     print(f"Standard: {routine.name}")
+
     print(f"Protocol: {routine.protocol}")
+
     print(f"Actual MAC Throughput: {throughput/1e6:.2f} Mb/s")
-    print(f"Time to Transmit 15 x 10^9 Bytes: {tf_time} seconds")
-    print(len(f"Time to Transmit (15 x 10^9) Bytes: {tf_time} seconds")*'=')
+    
+    if not (best_routine == None):
+        print(f"Actual MAC Throughput Best Case: {best_throughput/1e6:.2f} Mb/s")
+
+    print(f"Time to Transmit 15 x 10^9 Bytes: {tf_time:.2f} seconds")
+    
+    if not (best_routine == None):
+        print(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {best_tf_time:.2f} seconds")
+
+    print(len(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {best_tf_time:.2f} seconds")*'=')
     
 
 

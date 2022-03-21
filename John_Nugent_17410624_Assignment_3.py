@@ -93,7 +93,6 @@ class a:
 
         self.header.add_SNAP_bytes(8)   # Bytes
 
-        # self.SIFS = 16 # mu s
         self.set_sifs(16) # mu s
 
         self.slot = 9 # mu s
@@ -119,12 +118,11 @@ class a:
 
         if not protocol:
             # Default to UDP.
-            self.protocol = 'UDP' 
+            self.protocol = 'UDP'
 
         if not data_speed:
             # default to Max
             self.data_rating = self.data_ratings[1]
-
 
     def setup(self, protocol, data_speed):
         if protocol == 'UDP':
@@ -235,23 +233,42 @@ class a:
         sum = 0
         
         sum = sum + self.get_DIFS()
+
         sum = sum + self.preamble 
-        sum = sum + self.rts_tx_time() 
-        sum = sum + self.SIFS 
-        sum = sum + self.preamble 
+        sum = sum + self.rts_tx_time()
+        sum = sum + self.SIFS
+        
+        sum = sum + self.preamble
         sum = sum + self.cts_tx_time() 
         sum = sum + self.SIFS
+        
         sum = sum + self.preamble 
         sum = sum + self.tx_data_time(verbose=False) 
         sum = sum + self.SIFS
+        
         sum = sum + self.preamble 
         sum = sum + self.ack_tx_time()
 
         if self.protocol == 'TCP':
-            sum = sum + self.SIFS
-            sum = sum + self.tcp_ack_tx_time()
-            # print(f"tcp ack tx time: {self.tcp_ack_tx_time()}")
+            # All comes back again, but with tcp ack as the data.
+            # Coming from the Receiving device.
+            sum = sum + self.get_DIFS()
 
+            sum = sum + self.preamble 
+            sum = sum + self.rts_tx_time()
+            sum = sum + self.SIFS
+            
+            sum = sum + self.preamble
+            sum = sum + self.cts_tx_time() 
+            sum = sum + self.SIFS
+            
+            sum = sum + self.preamble 
+            # Here the data is replaced with the TCP ack transmission time.
+            sum = sum + self.tcp_ack_tx_time()
+            sum = sum + self.SIFS
+            
+            sum = sum + self.preamble
+            sum = sum + self.ack_tx_time() # The MAC-ACK tx time.
 
         return sum # mu s
 
@@ -281,11 +298,19 @@ class g(a):
         self.set_sifs(10)
 
     def time_to_send(self):
-        return a.time_to_send(self) + 6 # mu s
+        sum = super().time_to_send() # mu s
+        
+        sum = sum + 3*6 # extra tx per frame, for rts, cts and data.
+
+        if self.protocol == 'TCP':
+            sum = sum + 3*6 # extra tx per frame. for rts, cts and data.
+
+        return sum
         
     # End of class g.
 
 class n(a):
+    '''Normal Case Standard 802.11n.'''
     def __init__(self, protocol=None, data_speed=None):
         a.__init__(self, protocol, data_speed)
 
@@ -301,7 +326,8 @@ class n(a):
 
         self.symbol_tx_time = 3.6 # mu s
 
-        self.preamble = 46 # mu s
+        # Preamble same as a/g in normal case (1 sapcial stream).
+        # self.preamble = 46 # mu s
 
         self.tcp_ack = Ack()
         self.tcp_ack.add_MAC_bytes(40)
@@ -310,55 +336,74 @@ class n(a):
         self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("64-QAM", 6, 5/6, 52, 3.6, 72.2)]
 
 class n_best(n):
+    '''Best Case Standard 802.11n.'''
     def __init__(self, protocol=None, data_speed=None):
         n.__init__(self, protocol, data_speed)
+
+        self.preamble = 46 # mu s
 
         self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("40 MHz", 6, 5/6, 108, 3.6, 150, 4)]
 
 
 class ac_w1(n):
+    '''Normal Case Standard 802.11ac_w1.'''
     def __init__(self, protocol=None, data_speed=None):
         n.__init__(self, protocol=protocol, data_speed=data_speed)
 
         self.name = "802.11ac_w1"
 
-        self.preamble = 56.8
+        # Preamble Same as a/g in normal case.
+        # self.preamble = 56.8
 
         self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("256-QAM", 8, 5/6, 52, 3.6, 96.3)]
 
 class ac_w1_best(ac_w1):
+    '''Best Case Standard 802.11ac_w1.'''
     def __init__(self, protocol=None, data_speed=None):
         ac_w1.__init__(self, protocol, data_speed)
+
+        self.preamble = 56.8
 
         self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("80MHz", 8, 5/6, 234, 3.6, 433.3, 3)]
 
 class ac_w2(n):
+    '''Normal Case Standard 802.11ac_w2.'''
     def __init__(self, protocol=None, data_speed=None):
         n.__init__(self, protocol=protocol, data_speed=data_speed)
 
         self.name = "802.11ac_w2"
 
-        self.preamble = 92.8
+        # Preamble same as a/g in normal case.
+        # self.preamble = 92.8
 
         self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("256-QAM", 8, 5/6, 52, 3.6, 96.3, 1)]
 
 class ac_w2_best(ac_w2):
+    '''Best Case Standard 802.11ac_w2.'''
     def __init__(self, protocol=None, data_speed=None):
         ac_w2.__init__(self, protocol, data_speed)
+
+        self.preamble = 92.8
 
         self.data_ratings = [DataRating("BPSK", 1, 1/2, 52, 3.6, 7.2), DataRating("160MHz", 8, 5/6, 468, 3.6, 866.7, 8)]
 
 class ax(ac_w2):
+    '''Normal Case Standard 802.11ax.'''
     def __init__(self, protocol=None, data_speed=None):
         ac_w2.__init__(self, protocol, data_speed)
 
         self.name = "802.11ax"
 
+        self.symbol_tx_time = 13.6 # mu s
+
         self.data_ratings = [DataRating("BPSK", 1, 1/2, 234, 13.6, 8.6), DataRating("1024-QAM", 10, 5/6, 234, 13.6, 143.4, 1)]
 
 class ax_best(ax):
+    '''Best Case Standard 802.11ax.'''
     def __init__(self, protocol=None, data_speed=None):
         ax.__init__(self, protocol, data_speed)
+
+        self.preamble = 92.8
 
         self.data_ratings = [DataRating("BPSK", 1, 1/2, 1960, 13.6, 576.5, 8), DataRating("1024-QAM", 10, 5/6, 1960, 13.6, 9607.8, 8)]
 
@@ -375,6 +420,7 @@ def main():
         print(f"{i+1}. {std}")
     
     valid = False
+
     all_numbers = True
 
     while not valid:
@@ -401,10 +447,12 @@ def main():
         print(f"{i+1}. {dr}")
 
     valid = False
+    
     all_numbers = True
 
     while not valid:
         x = input("Number of Data Rate: ")
+    
         all_numbers = True
 
         for i in range(len(x)):
@@ -427,6 +475,7 @@ def main():
         print(f"{i+1}. {prot}")
 
     valid = False
+    
     all_numbers = True
 
     while not valid:
@@ -494,19 +543,23 @@ def main():
 
     print(f"Protocol: {routine.protocol}")
 
-    print(f"Data Speed: {data_rating} @ {routine.data_rating.get_data_rate():.2f} Mb/s")
+    print(f"Normal Case Data Speed: {data_rating} @ {routine.data_rating.get_data_rate():.2f} Mb/s")
 
-    print(f"Actual MAC Throughput in the Normal Case: {throughput/1e6:.2f} Mb/s")
+    if not (best_routine == None):
+        print(f"Best Case Data Speed: {data_rating} @ {best_routine.data_rating.get_data_rate():.2f} Mb/s")
+
+
+    print(f"Actual MAC Throughput in the Normal Case:\t{throughput/1e6:.2f} Mb/s")
     
     if not (best_routine == None):
-        print(f"Actual MAC Throughput Best Case: {best_throughput/1e6:.2f} Mb/s")
+        print(f"Actual MAC Throughput in the Best Case:\t\t{best_throughput/1e6:.2f} Mb/s")
 
-    print(f"Time to Transmit 15 x 10^9 Bytes in the Normal Case: {tf_time:.2f} seconds")
+    print(f"Time to Transmit in the Normal Case 15 x 10^9 Bytes:\t{tf_time:.2f} seconds")
     
     if not (best_routine == None):
-        print(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {best_tf_time:.2f} seconds")
+        print(f"Time to Transmit in the best Case 15 x 10^9 Bytes:\t{best_tf_time:.2f} seconds")
 
-    print(len(f"Time to Transmit in the best Case 15 x 10^9 Bytes: {tf_time:.2f} seconds")*'=')
+    print(len(f"Time to Transmit in the best Case 15 x 10^9 Bytes:\t{tf_time:.2f} seconds")*'=')
     
 
 
